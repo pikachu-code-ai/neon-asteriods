@@ -1,0 +1,2545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>NEON ASTEROIDS — Cyberpunk Vector Arcade</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Orbitron:wght@600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background-color: #05040a;
+      color: #f8fafc;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      overflow: hidden;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    .font-display {
+      font-family: 'Orbitron', 'Inter', sans-serif;
+    }
+
+    .tabular-nums {
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* High-contrast cyberpunk panels without expensive backdrop-filter */
+    .cyber-modal {
+      background-color: rgba(8, 7, 19, 0.95);
+      border: 2px solid rgba(0, 243, 255, 0.55);
+      box-shadow: 0 0 36px rgba(0, 243, 255, 0.2), inset 0 0 24px rgba(0, 243, 255, 0.06);
+    }
+
+    .cyber-hud-card {
+      background-color: rgba(8, 7, 19, 0.88);
+      border: 1px solid rgba(0, 243, 255, 0.28);
+    }
+
+    .neon-title-glow {
+      text-shadow: 0 0 14px rgba(0, 243, 255, 0.85), 0 0 32px rgba(184, 41, 255, 0.55);
+    }
+
+    .neon-danger-glow {
+      text-shadow: 0 0 14px rgba(255, 0, 127, 0.9), 0 0 32px rgba(255, 0, 60, 0.55);
+    }
+
+    .cyber-cta-btn {
+      background: linear-gradient(135deg, #00f3ff 0%, #3b82f6 50%, #ff007f 100%);
+      color: #05040a;
+      font-family: 'Orbitron', sans-serif;
+      font-weight: 900;
+      letter-spacing: 0.1em;
+      box-shadow: 0 0 24px rgba(0, 243, 255, 0.45);
+      transition: transform 0.1s ease, filter 0.15s ease;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+
+    .cyber-cta-btn:hover {
+      filter: brightness(1.12);
+    }
+
+    .cyber-cta-btn:active {
+      transform: scale(0.96);
+    }
+
+    /* Translucent tactile mobile controls */
+    .touch-btn {
+      background-color: rgba(10, 9, 26, 0.68);
+      border: 1.5px solid rgba(0, 243, 255, 0.42);
+      color: #e2e8f0;
+      touch-action: none;
+      transition: transform 0.06s ease, background-color 0.08s ease, border-color 0.08s ease;
+    }
+
+    .touch-btn.active-touch {
+      background-color: rgba(0, 243, 255, 0.24);
+      border-color: #00f3ff;
+      color: #ffffff;
+      transform: scale(0.94);
+    }
+
+    .touch-btn-fire {
+      background-color: rgba(255, 0, 127, 0.22);
+      border: 1.5px solid rgba(255, 0, 127, 0.65);
+      color: #ff80bf;
+    }
+
+    .touch-btn-fire.active-touch {
+      background-color: rgba(255, 0, 127, 0.45);
+      border-color: #ff007f;
+      color: #ffffff;
+      transform: scale(0.94);
+    }
+
+    .touch-btn-warp {
+      background-color: rgba(184, 41, 255, 0.2);
+      border: 1.5px solid rgba(184, 41, 255, 0.55);
+      color: #e0aaff;
+    }
+
+    .touch-btn-warp.active-touch {
+      background-color: rgba(184, 41, 255, 0.42);
+      border-color: #b829ff;
+      color: #ffffff;
+      transform: scale(0.94);
+    }
+
+    /* Show touch controls on small screens OR coarse-pointer touch devices */
+    @media (min-width: 768px) and (pointer: fine) {
+      #touchControlsLayer {
+        display: none !important;
+      }
+    }
+
+    /* Explicit layer hierarchy */
+    #gameCanvas {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+      display: block;
+    }
+
+    #hudLayer {
+      z-index: 10;
+    }
+
+    #touchControlsLayer {
+      z-index: 20;
+    }
+
+    #menuScreen,
+    #pauseScreen,
+    #gameOverScreen {
+      z-index: 30;
+      pointer-events: auto;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Z-0: Fullscreen High-FPS Vector Canvas -->
+  <canvas id="gameCanvas"></canvas>
+
+  <!-- Z-10: Non-Blocking Top HUD -->
+  <div id="hudLayer" class="fixed top-0 left-0 right-0 px-3 py-2.5 sm:px-6 sm:py-3.5 flex items-start justify-between gap-2 pointer-events-none">
+    
+    <!-- Left: Score, High Score, Wave & Combo -->
+    <div class="flex flex-col gap-1.5">
+      <div class="cyber-hud-card rounded-xl px-3 py-2 sm:px-4 sm:py-2.5 flex items-center gap-3 sm:gap-5 tabular-nums">
+        <div>
+          <div class="text-[9px] sm:text-[10px] font-bold tracking-widest text-cyan-400 uppercase">SCORE</div>
+          <div class="flex items-center gap-2">
+            <span id="scoreVal" class="font-display text-lg sm:text-2xl font-black text-white leading-none">0</span>
+            <span id="comboBadge" class="hidden font-display text-[10px] sm:text-xs font-black px-1.5 py-0.5 rounded bg-fuchsia-500 text-white">
+              2X
+            </span>
+          </div>
+        </div>
+
+        <div class="h-7 w-px bg-cyan-500/20"></div>
+
+        <div class="hidden sm:block">
+          <div class="text-[10px] font-bold tracking-widest text-purple-400 uppercase">BEST</div>
+          <div id="highScoreVal" class="font-display text-lg font-bold text-purple-200 leading-none">0</div>
+        </div>
+
+        <div class="hidden sm:block h-7 w-px bg-cyan-500/20"></div>
+
+        <div>
+          <div class="text-[9px] sm:text-[10px] font-bold tracking-widest text-amber-400 uppercase">WAVE</div>
+          <div id="waveVal" class="font-display text-base sm:text-xl font-black text-amber-300 leading-none">1</div>
+        </div>
+      </div>
+
+      <!-- Combo Timer Strip & Warp Cooldown Pill -->
+      <div class="flex items-center gap-2">
+        <div id="warpStatusPill" class="cyber-hud-card rounded-lg px-2.5 py-1 flex items-center gap-1.5 text-[10px] font-display font-bold tracking-wider text-purple-300">
+          <span id="warpDot" class="w-2 h-2 rounded-full bg-purple-400"></span>
+          <span id="warpStatusText">WARP READY</span>
+        </div>
+
+        <div id="comboBarWrap" class="hidden cyber-hud-card rounded-lg px-2.5 py-1 flex items-center gap-2">
+          <span class="text-[10px] font-display font-bold text-fuchsia-300">COMBO</span>
+          <div class="w-16 sm:w-20 h-1.5 rounded-full bg-slate-800 overflow-hidden">
+            <div id="comboTimerFill" class="h-full bg-gradient-to-r from-fuchsia-500 to-cyan-400" style="width: 100%"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Center: Active Power-Up Countdown Bars -->
+    <div id="activePowerupsHUD" class="flex flex-wrap justify-center gap-1.5 sm:gap-2 max-w-[40vw] sm:max-w-md">
+      <!-- Populated dynamically with active timed power-up progress bars -->
+    </div>
+
+    <!-- Right: Hull Lives & Mute / Pause Controls -->
+    <div class="flex items-center gap-2 sm:gap-3 pointer-events-auto">
+      <!-- Ship Hull Lives -->
+      <div class="cyber-hud-card rounded-xl px-2.5 py-2 sm:px-3.5 sm:py-2.5 flex items-center gap-1.5">
+        <span class="hidden lg:inline text-[10px] font-bold tracking-widest text-slate-400 uppercase mr-1">HULL</span>
+        <div id="livesIconsRow" class="flex items-center gap-1"></div>
+      </div>
+
+      <!-- Mute Toggle Button (M) -->
+      <button
+        id="muteBtn"
+        type="button"
+        onclick="window.toggleMute()"
+        title="Mute / Unmute (M)"
+        aria-label="Toggle Sound"
+        class="cyber-hud-card hover:border-cyan-400 rounded-xl p-2 sm:p-2.5 text-cyan-300 hover:text-white transition-colors cursor-pointer active:scale-95"
+      >
+        <svg id="iconAudioOn" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M11 5L6 9H2v6h4l5 4V5z"></path>
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15.54 8.46a5 5 0 010 7.07M19.07 4.93a10 10 0 010 14.14"></path>
+        </svg>
+        <svg id="iconAudioOff" class="w-5 h-5 hidden text-rose-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M11 5L6 9H2v6h4l5 4V5z"></path>
+          <path stroke-linecap="round" stroke-linejoin="round" d="M23 9l-6 6M17 9l6 6"></path>
+        </svg>
+      </button>
+
+      <!-- Pause Toggle Button (P) -->
+      <button
+        id="pauseBtn"
+        type="button"
+        onclick="window.togglePause()"
+        title="Pause Game (P)"
+        aria-label="Pause Game"
+        class="cyber-hud-card hover:border-fuchsia-400 rounded-xl p-2 sm:p-2.5 text-fuchsia-300 hover:text-white transition-colors cursor-pointer active:scale-95"
+      >
+        <svg id="iconPauseBars" class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M10 9v6m4-6v6"></path>
+        </svg>
+        <svg id="iconResumeTri" class="w-5 h-5 hidden text-emerald-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M8 5v14l11-7z"></path>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Wave Announcement Banner (Non-blocking center toast) -->
+  <div id="waveBanner" class="hidden fixed inset-x-0 top-24 z-10 flex justify-center pointer-events-none px-4">
+    <div class="cyber-hud-card border-2 border-cyan-400/70 rounded-2xl px-7 py-3 text-center">
+      <div id="waveBannerSub" class="text-[10px] sm:text-xs font-bold tracking-widest text-cyan-300 uppercase">SECTOR SECURED</div>
+      <div id="waveBannerTitle" class="font-display text-2xl sm:text-3xl font-black tracking-widest text-white">WAVE 2</div>
+    </div>
+  </div>
+
+  <!-- Z-20: Responsive Multi-Touch Controls (Mobile & Touch Devices) -->
+  <div id="touchControlsLayer" class="fixed inset-x-0 bottom-0 p-3 sm:p-5 flex items-end justify-between pointer-events-none">
+    <!-- Bottom-Left: Rotate Left, Rotate Right, Thrust -->
+    <div class="flex items-center gap-2 sm:gap-3 pointer-events-auto">
+      <button
+        id="touchLeftBtn"
+        type="button"
+        aria-label="Rotate Left"
+        class="touch-btn w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center font-display text-xl font-black"
+      >
+        ↺
+      </button>
+      <button
+        id="touchRightBtn"
+        type="button"
+        aria-label="Rotate Right"
+        class="touch-btn w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center font-display text-xl font-black"
+      >
+        ↻
+      </button>
+      <button
+        id="touchThrustBtn"
+        type="button"
+        aria-label="Thrust"
+        class="touch-btn w-16 h-14 sm:w-20 sm:h-16 rounded-2xl flex flex-col items-center justify-center font-display text-xs font-extrabold tracking-wider"
+      >
+        <span class="text-base leading-none mb-0.5">▲</span>
+        <span>THRUST</span>
+      </button>
+    </div>
+
+    <!-- Bottom-Right: Warp & Fire -->
+    <div class="flex items-center gap-2 sm:gap-3 pointer-events-auto">
+      <button
+        id="touchWarpBtn"
+        type="button"
+        aria-label="Hyperspace Warp"
+        class="touch-btn touch-btn-warp w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex flex-col items-center justify-center font-display text-[11px] font-extrabold tracking-wider"
+      >
+        <span class="text-sm leading-none mb-0.5">✦</span>
+        <span>WARP</span>
+      </button>
+      <button
+        id="touchFireBtn"
+        type="button"
+        aria-label="Fire Plasma"
+        class="touch-btn touch-btn-fire w-16 h-16 sm:w-20 sm:h-20 rounded-2xl flex flex-col items-center justify-center font-display text-xs font-black tracking-wider"
+      >
+        <span class="text-lg leading-none mb-0.5">◎</span>
+        <span>FIRE</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Z-30: Start Menu Overlay -->
+  <div id="menuScreen" style="z-index: 30; pointer-events: auto;" class="fixed inset-0 flex items-center justify-center p-4">
+    <div class="cyber-modal rounded-2xl p-5 sm:p-7 max-w-xl w-full max-h-[92vh] overflow-y-auto">
+      <div class="text-center mb-4">
+        <div class="inline-block px-3 py-0.5 rounded-full bg-cyan-500/15 border border-cyan-400/35 text-cyan-300 text-[10px] sm:text-xs font-bold tracking-widest uppercase mb-1.5">
+          Vector Space Combat
+        </div>
+        <h1 class="font-display text-3xl sm:text-5xl font-black tracking-wider text-white neon-title-glow italic">
+          NEON ASTEROIDS
+        </h1>
+      </div>
+
+      <!-- Controls Bar -->
+      <div class="rounded-xl bg-white/[0.04] border border-white/10 p-3 mb-4 text-xs text-slate-300 text-center space-y-1">
+        <div>
+          <strong class="text-cyan-300">Flight:</strong>
+          <kbd class="px-1.5 py-0.5 bg-white/10 rounded text-white">W/▲</kbd> Thrust &bull;
+          <kbd class="px-1.5 py-0.5 bg-white/10 rounded text-white">A/D</kbd> or <kbd class="px-1.5 py-0.5 bg-white/10 rounded text-white">◀/▶</kbd> Rotate
+        </div>
+        <div>
+          <strong class="text-pink-400">Combat:</strong>
+          <kbd class="px-1.5 py-0.5 bg-white/10 rounded text-white">SPACE</kbd> Auto-Fire &bull;
+          <kbd class="px-1.5 py-0.5 bg-white/10 rounded text-white">SHIFT / S</kbd> Hyperspace Warp
+        </div>
+      </div>
+
+      <!-- 6 Power-Ups Arsenal Grid -->
+      <div class="mb-5">
+        <div class="text-[11px] font-display font-bold uppercase tracking-widest text-slate-400 mb-2 text-center">
+          6 Tactical Power-Up Capsules
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-left">
+          <!-- 1. Triple Scatter -->
+          <div class="flex items-center gap-2.5 p-2 rounded-xl bg-white/[0.03] border border-cyan-400/30">
+            <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 font-display text-xs font-black text-cyan-300" style="background: rgba(0,243,255,0.16); border: 1.5px solid #00f3ff;">3X</div>
+            <div>
+              <div class="text-xs font-bold text-cyan-300">TRIPLE SCATTER <span class="text-[10px] text-slate-400 font-normal">(10s)</span></div>
+              <div class="text-[11px] text-slate-400 leading-tight">3-way spread of plasma bolts</div>
+            </div>
+          </div>
+
+          <!-- 2. Plasma Railgun -->
+          <div class="flex items-center gap-2.5 p-2 rounded-xl bg-white/[0.03] border border-yellow-400/30">
+            <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 font-display text-xs font-black text-yellow-300" style="background: rgba(255,234,0,0.16); border: 1.5px solid #ffea00;">R</div>
+            <div>
+              <div class="text-xs font-bold text-yellow-300">PLASMA RAILGUN <span class="text-[10px] text-slate-400 font-normal">(8s)</span></div>
+              <div class="text-[11px] text-slate-400 leading-tight">Piercing beams slice multiple targets</div>
+            </div>
+          </div>
+
+          <!-- 3. Aegis Shield -->
+          <div class="flex items-center gap-2.5 p-2 rounded-xl bg-white/[0.03] border border-emerald-400/30">
+            <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 font-display text-xs font-black text-emerald-300" style="background: rgba(0,255,102,0.16); border: 1.5px solid #00ff66;">S</div>
+            <div>
+              <div class="text-xs font-bold text-emerald-300">AEGIS SHIELD <span class="text-[10px] text-slate-400 font-normal">(12s / 1 Hit)</span></div>
+              <div class="text-[11px] text-slate-400 leading-tight">Hex barrier absorbs impact &amp; blasts foes</div>
+            </div>
+          </div>
+
+          <!-- 4. Chrono Field -->
+          <div class="flex items-center gap-2.5 p-2 rounded-xl bg-white/[0.03] border border-sky-400/30">
+            <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 font-display text-xs font-black text-sky-300" style="background: rgba(56,189,248,0.16); border: 1.5px solid #38bdf8;">C</div>
+            <div>
+              <div class="text-xs font-bold text-sky-300">CHRONO FIELD <span class="text-[10px] text-slate-400 font-normal">(8s)</span></div>
+              <div class="text-[11px] text-slate-400 leading-tight">Slows asteroids &amp; enemy bolts by 50%</div>
+            </div>
+          </div>
+
+          <!-- 5. Nova EMP -->
+          <div class="flex items-center gap-2.5 p-2 rounded-xl bg-white/[0.03] border border-purple-400/30">
+            <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 font-display text-xs font-black text-purple-300" style="background: rgba(184,41,255,0.16); border: 1.5px solid #b829ff;">E</div>
+            <div>
+              <div class="text-xs font-bold text-purple-300">NOVA EMP <span class="text-[10px] text-slate-400 font-normal">(Instant)</span></div>
+              <div class="text-[11px] text-slate-400 leading-tight">Radial shockwave shatters nearby rocks</div>
+            </div>
+          </div>
+
+          <!-- 6. Extra Hull Life -->
+          <div class="flex items-center gap-2.5 p-2 rounded-xl bg-white/[0.03] border border-rose-400/30">
+            <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 font-display text-xs font-black text-rose-300" style="background: rgba(255,42,109,0.16); border: 1.5px solid #ff2a6d;">+1</div>
+            <div>
+              <div class="text-xs font-bold text-rose-300">EXTRA HULL LIFE <span class="text-[10px] text-slate-400 font-normal">(Instant)</span></div>
+              <div class="text-[11px] text-slate-400 leading-tight">+1 Hull Life (up to 5 max)</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex flex-col items-center gap-2.5">
+        <button
+          id="startBtn"
+          type="button"
+          onclick="window.startGame()"
+          class="cyber-cta-btn w-full sm:w-auto px-12 py-3.5 rounded-xl text-base sm:text-lg uppercase"
+        >
+          ▶ LAUNCH FIGHTER
+        </button>
+        <div class="text-xs font-mono text-slate-400">
+          HIGH SCORE: <span id="menuHighScore" class="text-cyan-300 font-bold">0</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Z-30: Pause Overlay -->
+  <div id="pauseScreen" style="z-index: 30; pointer-events: auto;" class="hidden fixed inset-0 flex items-center justify-center p-4">
+    <div class="cyber-modal border-fuchsia-400/70 rounded-2xl p-7 max-w-sm w-full text-center">
+      <div class="text-xs font-bold tracking-widest text-fuchsia-300 uppercase mb-1">SYSTEMS STANDBY</div>
+      <h2 class="font-display text-3xl font-black text-white tracking-wider mb-5">PAUSED</h2>
+      <div class="flex flex-col gap-2.5">
+        <button
+          id="resumeBtn"
+          type="button"
+          onclick="window.togglePause()"
+          class="cyber-cta-btn w-full py-3 rounded-xl text-sm uppercase"
+        >
+          ▶ RESUME FLIGHT
+        </button>
+        <button
+          type="button"
+          onclick="window.startGame()"
+          class="w-full py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/15 text-xs font-bold uppercase tracking-wider text-slate-200 cursor-pointer"
+        >
+          ↺ RESTART MISSION
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Z-30: Game Over Overlay -->
+  <div id="gameOverScreen" style="z-index: 30; pointer-events: auto;" class="hidden fixed inset-0 flex items-center justify-center p-4">
+    <div class="cyber-modal border-rose-500/80 rounded-2xl p-7 max-w-sm w-full text-center">
+      <div class="text-xs font-bold tracking-widest text-rose-400 uppercase mb-1">HULL BREACHED</div>
+      <h2 class="font-display text-3xl sm:text-4xl font-black text-white neon-danger-glow tracking-wider mb-3">
+        GAME OVER
+      </h2>
+
+      <div id="newHighScoreBadge" class="hidden inline-block px-3 py-0.5 rounded-full bg-amber-400/20 border border-amber-400 text-amber-300 text-xs font-extrabold tracking-wider uppercase mb-3">
+        ★ NEW HIGH SCORE ★
+      </div>
+
+      <div class="rounded-xl bg-white/[0.04] border border-white/10 p-4 mb-5 space-y-2 tabular-nums">
+        <div class="flex justify-between items-center">
+          <span class="text-xs text-slate-400 uppercase font-semibold">Final Score</span>
+          <span id="finalScoreVal" class="font-display text-xl font-black text-cyan-300">0</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-xs text-slate-400 uppercase font-semibold">High Score</span>
+          <span id="finalBestVal" class="font-display text-base font-bold text-purple-300">0</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-xs text-slate-400 uppercase font-semibold">Wave Reached</span>
+          <span id="finalWaveVal" class="font-display text-base font-bold text-amber-300">1</span>
+        </div>
+      </div>
+
+      <button
+        id="restartBtn"
+        type="button"
+        onclick="window.startGame()"
+        class="cyber-cta-btn w-full py-3.5 rounded-xl text-base uppercase"
+      >
+        ↻ RELAUNCH
+      </button>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      // =========================================================================
+      // 1. SAFE STORAGE & PROCEDURAL WEB AUDIO RETRO SYNTHESIZER
+      // =========================================================================
+      const STORAGE_KEY = 'neonAsteroidsHighScore';
+      let audioCtx = null;
+      let isMuted = false;
+
+      function safeGetHighScore() {
+        try {
+          const val = parseInt(window.localStorage.getItem(STORAGE_KEY) || '0', 10);
+          return Number.isFinite(val) && val > 0 ? val : 0;
+        } catch (err) {
+          return 0;
+        }
+      }
+
+      function safeSetHighScore(scoreVal) {
+        try {
+          window.localStorage.setItem(STORAGE_KEY, String(Math.max(0, Math.floor(scoreVal))));
+        } catch (err) {
+          // Ignore sandboxed storage limits
+        }
+      }
+
+      function initAudio() {
+        try {
+          if (!audioCtx) {
+            const Ctx = window.AudioContext || window.webkitAudioContext;
+            if (Ctx) audioCtx = new Ctx();
+          }
+          if (audioCtx && audioCtx.state === 'suspended') {
+            audioCtx.resume().catch(function () {});
+          }
+        } catch (err) {
+          audioCtx = null;
+        }
+      }
+
+      function synthTone(fStart, fEnd, dur, wave, vol, delay) {
+        if (isMuted) return;
+        try {
+          initAudio();
+          if (!audioCtx) return;
+          const t0 = audioCtx.currentTime + (delay || 0);
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = wave || 'sawtooth';
+          osc.frequency.setValueAtTime(fStart, t0);
+          if (fEnd && fEnd !== fStart) {
+            osc.frequency.exponentialRampToValueAtTime(Math.max(20, fEnd), t0 + dur);
+          }
+          gain.gain.setValueAtTime(0.0001, t0);
+          gain.gain.linearRampToValueAtTime(vol || 0.12, t0 + 0.008);
+          gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start(t0);
+          osc.stop(t0 + dur + 0.02);
+        } catch (err) {}
+      }
+
+      function synthNoiseBurst(dur, filterFreq, vol) {
+        if (isMuted) return;
+        try {
+          initAudio();
+          if (!audioCtx) return;
+          const sampleRate = audioCtx.sampleRate;
+          const frameCount = Math.max(1, Math.floor(sampleRate * dur));
+          const buffer = audioCtx.createBuffer(1, frameCount, sampleRate);
+          const data = buffer.getChannelData(0);
+          for (let i = 0; i < frameCount; i++) {
+            data[i] = Math.random() * 2 - 1;
+          }
+
+          const src = audioCtx.createBufferSource();
+          src.buffer = buffer;
+
+          const filter = audioCtx.createBiquadFilter();
+          filter.type = 'lowpass';
+          filter.frequency.setValueAtTime(filterFreq || 420, audioCtx.currentTime);
+          filter.frequency.exponentialRampToValueAtTime(60, audioCtx.currentTime + dur);
+
+          const gain = audioCtx.createGain();
+          gain.gain.setValueAtTime(vol || 0.2, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+
+          src.connect(filter);
+          filter.connect(gain);
+          gain.connect(audioCtx.destination);
+          src.start();
+        } catch (err) {}
+      }
+
+      const sfx = {
+        laser: function (weaponType) {
+          if (weaponType === 'railgun') {
+            synthTone(1180, 190, 0.16, 'sawtooth', 0.14, 0);
+            synthTone(640, 120, 0.14, 'square', 0.09, 0.01);
+          } else if (weaponType === 'triple') {
+            synthTone(860, 240, 0.09, 'triangle', 0.11, 0);
+          } else {
+            synthTone(740, 190, 0.085, 'sawtooth', 0.1, 0);
+          }
+        },
+        ufoShot: function () {
+          synthTone(320, 140, 0.14, 'square', 0.08, 0);
+        },
+        ufoWarble: function () {
+          synthTone(480, 560, 0.09, 'sine', 0.045, 0);
+          synthTone(560, 440, 0.09, 'sine', 0.045, 0.09);
+        },
+        explosion: function (sizeTier) {
+          // sizeTier: 3 = large, 2 = medium, 1 = small, 4 = UFO/Ship
+          if (sizeTier >= 4) {
+            synthNoiseBurst(0.45, 520, 0.26);
+            synthTone(135, 28, 0.42, 'sawtooth', 0.2, 0);
+          } else if (sizeTier === 3) {
+            synthNoiseBurst(0.32, 340, 0.2);
+            synthTone(115, 32, 0.3, 'sawtooth', 0.16, 0);
+          } else if (sizeTier === 2) {
+            synthNoiseBurst(0.22, 460, 0.15);
+            synthTone(165, 45, 0.2, 'triangle', 0.13, 0);
+          } else {
+            synthNoiseBurst(0.14, 680, 0.11);
+            synthTone(240, 70, 0.13, 'triangle', 0.1, 0);
+          }
+        },
+        powerup: function (id) {
+          if (id === 'emp') {
+            synthTone(220, 960, 0.22, 'sawtooth', 0.16, 0);
+            synthNoiseBurst(0.35, 900, 0.18);
+          } else if (id === 'life') {
+            synthTone(523.25, 523.25, 0.08, 'triangle', 0.14, 0);
+            synthTone(659.25, 659.25, 0.08, 'triangle', 0.14, 0.07);
+            synthTone(1046.5, 1046.5, 0.2, 'triangle', 0.16, 0.14);
+          } else {
+            synthTone(440, 660, 0.07, 'triangle', 0.13, 0);
+            synthTone(554.37, 880, 0.08, 'triangle', 0.13, 0.06);
+            synthTone(659.25, 1174.66, 0.14, 'triangle', 0.15, 0.12);
+          }
+        },
+        shieldAbsorb: function () {
+          synthTone(300, 820, 0.18, 'sine', 0.18, 0);
+          synthTone(600, 200, 0.22, 'triangle', 0.14, 0.05);
+        },
+        warp: function () {
+          synthTone(180, 1280, 0.16, 'sine', 0.14, 0);
+          synthTone(1100, 220, 0.18, 'triangle', 0.12, 0.12);
+        },
+        waveClear: function () {
+          const notes = [440, 554.37, 659.25, 880];
+          for (let i = 0; i < notes.length; i++) {
+            synthTone(notes[i], notes[i] * 1.03, 0.15, 'triangle', 0.14, i * 0.08);
+          }
+        }
+      };
+
+      // =========================================================================
+      // 2. CONSTANTS, PALETTE & 6 POWER-UP DEFINITIONS
+      // =========================================================================
+      const PALETTE = {
+        bg: '#05040a',
+        cyan: '#00f3ff',
+        magenta: '#ff007f',
+        purple: '#b829ff',
+        gold: '#ffea00',
+        emerald: '#00ff66',
+        ice: '#38bdf8',
+        rose: '#ff2a6d',
+        orange: '#ff7b00'
+      };
+
+      const ASTEROID_COLORS = [PALETTE.magenta, PALETTE.purple, PALETTE.cyan];
+
+      const POWERUP_DEFS = {
+        triple: {
+          id: 'triple',
+          name: 'TRIPLE SCATTER',
+          shortLabel: '3X SCATTER',
+          icon: '3X',
+          color: PALETTE.cyan,
+          duration: 10.0,
+          weight: 22
+        },
+        railgun: {
+          id: 'railgun',
+          name: 'PLASMA RAILGUN',
+          shortLabel: 'RAILGUN',
+          icon: 'R',
+          color: PALETTE.gold,
+          duration: 8.0,
+          weight: 20
+        },
+        shield: {
+          id: 'shield',
+          name: 'AEGIS SHIELD',
+          shortLabel: 'SHIELD',
+          icon: 'S',
+          color: PALETTE.emerald,
+          duration: 12.0,
+          weight: 20
+        },
+        chrono: {
+          id: 'chrono',
+          name: 'CHRONO FIELD',
+          shortLabel: 'CHRONO',
+          icon: 'C',
+          color: PALETTE.ice,
+          duration: 8.0,
+          weight: 18
+        },
+        emp: {
+          id: 'emp',
+          name: 'NOVA EMP',
+          shortLabel: 'NOVA EMP',
+          icon: 'E',
+          color: PALETTE.purple,
+          duration: 0, // Instant
+          weight: 12
+        },
+        life: {
+          id: 'life',
+          name: 'EXTRA HULL LIFE',
+          shortLabel: '+1 HULL',
+          icon: '+1',
+          color: PALETTE.rose,
+          duration: 0, // Instant
+          weight: 8
+        }
+      };
+
+      const MAX_LIVES = 5;
+      const STARTING_LIVES = 3;
+      const WARP_COOLDOWN_SEC = 4.0;
+      const COMBO_WINDOW_SEC = 3.2;
+
+      // =========================================================================
+      // 3. CANVAS, SPRITE CACHE & POOLED PARTICLES
+      // =========================================================================
+      const canvas = document.getElementById('gameCanvas');
+      const ctx = canvas.getContext('2d', { alpha: false });
+
+      let viewW = window.innerWidth;
+      let viewH = window.innerHeight;
+      let lastStartCallMs = 0;
+
+      // Pre-rendered radial glow sprites (zero shadowBlur cost at 60 FPS)
+      const glowCache = {};
+      function getGlowSprite(color, radius) {
+        const key = color + '_' + radius;
+        if (glowCache[key]) return glowCache[key];
+
+        const size = radius * 2;
+        const off = document.createElement('canvas');
+        off.width = size;
+        off.height = size;
+        const octx = off.getContext('2d');
+        const grad = octx.createRadialGradient(radius, radius, 0, radius, radius, radius);
+        grad.addColorStop(0, color);
+        grad.addColorStop(0.35, color + '66');
+        grad.addColorStop(1, color + '00');
+        octx.fillStyle = grad;
+        octx.fillRect(0, 0, size, size);
+
+        glowCache[key] = off;
+        return off;
+      }
+
+      // Pre-allocated Particle Pool
+      const MAX_PARTICLES = 260;
+      const particles = [];
+      for (let i = 0; i < MAX_PARTICLES; i++) {
+        particles.push({
+          active: false,
+          x: 0,
+          y: 0,
+          vx: 0,
+          vy: 0,
+          size: 2.5,
+          color: PALETTE.cyan,
+          life: 0,
+          maxLife: 0.5
+        });
+      }
+
+      // Background twinkling starfield
+      let stars = [];
+      function buildStarfield() {
+        const count = Math.min(130, Math.floor((viewW * viewH) / 11000));
+        stars = [];
+        const tints = ['#ffffff', '#a5f3fc', '#f5d0fe', '#bae6fd'];
+        for (let i = 0; i < count; i++) {
+          stars.push({
+            x: Math.random() * viewW,
+            y: Math.random() * viewH,
+            r: 0.7 + Math.random() * 1.4,
+            phase: Math.random() * Math.PI * 2,
+            speed: 1.2 + Math.random() * 2.5,
+            color: tints[i % tints.length]
+          });
+        }
+      }
+
+      // =========================================================================
+      // 4. GAME STATE & ENTITIES
+      // =========================================================================
+      let gameState = 'MENU'; // 'MENU' | 'PLAYING' | 'PAUSED' | 'GAMEOVER'
+      let score = 0;
+      let highScore = safeGetHighScore();
+      let wave = 1;
+      let lives = STARTING_LIVES;
+
+      let combo = 0;
+      let comboTimer = 0;
+
+      // Active timed power-ups: { triple, railgun, shield, chrono }
+      let activeTimers = {};
+
+      // Player Ship
+      const ship = {
+        x: 0,
+        y: 0,
+        vx: 0,
+        vy: 0,
+        angle: -Math.PI / 2,
+        radius: 15,
+        invulnTimer: 0,
+        fireCooldown: 0,
+        warpCooldown: 0,
+        thrustAnim: 0
+      };
+
+      let asteroids = [];
+      let nextAsteroidId = 1;
+      let bullets = [];
+      let enemyBullets = [];
+      let ufos = [];
+      let capsules = [];
+      let shockwaves = [];
+      let popups = [];
+
+      let ufoSpawnTimer = 12.0;
+      let ufoWarbleTimer = 0;
+      let waveClearPending = false;
+      let waveClearDelay = 0;
+      let waveBannerTimer = 0;
+      let screenShakeTime = 0;
+      let screenShakeMag = 0;
+      let lastFrameTime = 0;
+
+      // Combined Desktop + Touch Input State
+      const input = {
+        left: false,
+        right: false,
+        thrust: false,
+        fire: false
+      };
+
+      // =========================================================================
+      // 5. RESIZE & TOROIDAL WRAP HELPERS
+      // =========================================================================
+      function resizeCanvas() {
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        viewW = window.innerWidth;
+        viewH = window.innerHeight;
+        canvas.width = Math.floor(viewW * dpr);
+        canvas.height = Math.floor(viewH * dpr);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        buildStarfield();
+      }
+      window.addEventListener('resize', resizeCanvas);
+
+      function wrapPosition(entity, margin) {
+        const pad = margin || 0;
+        if (entity.x < -pad) entity.x += viewW + pad * 2;
+        else if (entity.x > viewW + pad) entity.x -= viewW + pad * 2;
+
+        if (entity.y < -pad) entity.y += viewH + pad * 2;
+        else if (entity.y > viewH + pad) entity.y -= viewH + pad * 2;
+      }
+
+      // Draw an entity across toroidal screen edges when near borders
+      function drawWithToroidalWrap(x, y, radius, drawFn) {
+        const offsetsX = [0];
+        const offsetsY = [0];
+
+        if (x < radius * 1.5) offsetsX.push(viewW);
+        else if (x > viewW - radius * 1.5) offsetsX.push(-viewW);
+
+        if (y < radius * 1.5) offsetsY.push(viewH);
+        else if (y > viewH - radius * 1.5) offsetsY.push(-viewH);
+
+        for (let ix = 0; ix < offsetsX.length; ix++) {
+          for (let iy = 0; iy < offsetsY.length; iy++) {
+            drawFn(x + offsetsX[ix], y + offsetsY[iy]);
+          }
+        }
+      }
+
+      // =========================================================================
+      // 6. ASTEROID, UFO & SAFE SPAWNING GENERATORS
+      // =========================================================================
+      function createAsteroid(x, y, tier, baseVx, baseVy) {
+        // tier: 3 = Large, 2 = Medium, 1 = Small
+        const radius = tier === 3 ? 44 : tier === 2 ? 25 : 14;
+        const vertexCount = tier === 3 ? 13 : tier === 2 ? 11 : 9;
+        const vertices = [];
+
+        for (let i = 0; i < vertexCount; i++) {
+          const a = (i / vertexCount) * Math.PI * 2;
+          const jag = 0.78 + Math.random() * 0.38;
+          vertices.push({
+            cos: Math.cos(a) * jag,
+            sin: Math.sin(a) * jag
+          });
+        }
+
+        // Internal crystalline facet lines for rich vector detail
+        const facets = [];
+        const facetPairs = tier === 3 ? 3 : tier === 2 ? 2 : 1;
+        for (let f = 0; f < facetPairs; f++) {
+          const i1 = Math.floor((f / facetPairs) * vertexCount);
+          const i2 = (i1 + Math.floor(vertexCount * 0.42)) % vertexCount;
+          facets.push([i1, i2]);
+        }
+
+        const speedBase = (tier === 3 ? 68 : tier === 2 ? 108 : 155) + Math.min(95, (wave - 1) * 9);
+        const angle = Math.random() * Math.PI * 2;
+        const vx = baseVx !== undefined ? baseVx : Math.cos(angle) * speedBase * (0.75 + Math.random() * 0.5);
+        const vy = baseVy !== undefined ? baseVy : Math.sin(angle) * speedBase * (0.75 + Math.random() * 0.5);
+
+        return {
+          id: nextAsteroidId++,
+          x: x,
+          y: y,
+          vx: vx,
+          vy: vy,
+          radius: radius,
+          tier: tier,
+          angle: Math.random() * Math.PI * 2,
+          rotSpeed: (Math.random() - 0.5) * (tier === 1 ? 2.6 : 1.5),
+          color: ASTEROID_COLORS[Math.floor(Math.random() * ASTEROID_COLORS.length)],
+          vertices: vertices,
+          facets: facets
+        };
+      }
+
+      function spawnWaveAsteroids(waveNum) {
+        asteroids = [];
+        const count = Math.min(11, 3 + waveNum);
+        const safeZoneR = 165;
+
+        for (let i = 0; i < count; i++) {
+          let ax = 0;
+          let ay = 0;
+          let attempts = 0;
+          do {
+            ax = Math.random() * viewW;
+            ay = Math.random() * viewH;
+            attempts++;
+          } while (Math.hypot(ax - ship.x, ay - ship.y) < safeZoneR && attempts < 30);
+
+          asteroids.push(createAsteroid(ax, ay, 3));
+        }
+      }
+
+      function spawnCyberUFO() {
+        const fromLeft = Math.random() < 0.5;
+        const y = 90 + Math.random() * Math.max(120, viewH - 180);
+        const speed = (135 + Math.min(80, wave * 8)) * (fromLeft ? 1 : -1);
+
+        ufos.push({
+          x: fromLeft ? -36 : viewW + 36,
+          y: y,
+          vx: speed,
+          baseY: y,
+          phase: Math.random() * Math.PI * 2,
+          radius: 22,
+          hp: wave >= 5 ? 2 : 1,
+          fireTimer: 1.4
+        });
+      }
+
+      function findSafeCoordinates() {
+        let bestX = viewW * 0.5;
+        let bestY = viewH * 0.5;
+        let bestMinDist = -1;
+
+        for (let attempt = 0; attempt < 36; attempt++) {
+          const cx = 60 + Math.random() * Math.max(80, viewW - 120);
+          const cy = 80 + Math.random() * Math.max(100, viewH - 160);
+          let minDist = 99999;
+
+          for (let i = 0; i < asteroids.length; i++) {
+            const d = Math.hypot(cx - asteroids[i].x, cy - asteroids[i].y) - asteroids[i].radius;
+            if (d < minDist) minDist = d;
+          }
+          for (let i = 0; i < ufos.length; i++) {
+            const d = Math.hypot(cx - ufos[i].x, cy - ufos[i].y) - 35;
+            if (d < minDist) minDist = d;
+          }
+          for (let i = 0; i < enemyBullets.length; i++) {
+            const d = Math.hypot(cx - enemyBullets[i].x, cy - enemyBullets[i].y);
+            if (d < minDist) minDist = d;
+          }
+
+          if (minDist > 165) {
+            return { x: cx, y: cy };
+          }
+          if (minDist > bestMinDist) {
+            bestMinDist = minDist;
+            bestX = cx;
+            bestY = cy;
+          }
+        }
+        return { x: bestX, y: bestY };
+      }
+
+      // =========================================================================
+      // 7. PARTICLES, POPUPS, SHOCKWAVES & HUD RENDERING
+      // =========================================================================
+      function spawnParticles(x, y, color, count, speedScale) {
+        let spawned = 0;
+        const mult = speedScale || 1;
+        for (let i = 0; i < MAX_PARTICLES && spawned < count; i++) {
+          const p = particles[i];
+          if (!p.active) {
+            const a = Math.random() * Math.PI * 2;
+            const spd = (55 + Math.random() * 210) * mult;
+            p.active = true;
+            p.x = x;
+            p.y = y;
+            p.vx = Math.cos(a) * spd;
+            p.vy = Math.sin(a) * spd;
+            p.size = 2 + Math.random() * 2.8;
+            p.color = Math.random() > 0.22 ? color : '#ffffff';
+            p.maxLife = 0.32 + Math.random() * 0.36;
+            p.life = p.maxLife;
+            spawned++;
+          }
+        }
+      }
+
+      function spawnPopup(x, y, text, color) {
+        if (popups.length >= 28) popups.shift();
+        popups.push({
+          x: Math.max(54, Math.min(viewW - 54, x)),
+          y: Math.max(68, Math.min(viewH - 40, y)),
+          text: text,
+          color: color || '#ffffff',
+          life: 1.05,
+          vy: -42
+        });
+      }
+
+      function triggerShake(duration, magnitude) {
+        screenShakeTime = Math.max(screenShakeTime, duration);
+        screenShakeMag = Math.max(screenShakeMag, magnitude);
+      }
+
+      function addScore(basePoints, popupX, popupY, color, customLabel) {
+        const mult = Math.max(1, combo);
+        const earned = Math.round(basePoints * mult);
+        score += earned;
+        if (score > highScore) {
+          highScore = score;
+          safeSetHighScore(highScore);
+        }
+        updateHUD();
+
+        if (popupX !== undefined && popupY !== undefined) {
+          const label = customLabel || (mult > 1 ? '+' + earned + ' (' + mult + 'x)' : '+' + earned);
+          spawnPopup(popupX, popupY, label, color || PALETTE.cyan);
+        }
+        return earned;
+      }
+
+      function registerComboKill() {
+        combo = Math.min(12, combo + 1);
+        comboTimer = COMBO_WINDOW_SEC;
+        updateHUD();
+      }
+
+      function updateHUD() {
+        document.getElementById('scoreVal').textContent = score.toLocaleString();
+        document.getElementById('highScoreVal').textContent = highScore.toLocaleString();
+        document.getElementById('waveVal').textContent = String(wave);
+
+        const comboBadge = document.getElementById('comboBadge');
+        const comboBarWrap = document.getElementById('comboBarWrap');
+        if (combo >= 2 && comboTimer > 0) {
+          comboBadge.textContent = combo + 'X';
+          comboBadge.classList.remove('hidden');
+          comboBarWrap.classList.remove('hidden');
+        } else {
+          comboBadge.classList.add('hidden');
+          comboBarWrap.classList.add('hidden');
+        }
+      }
+
+      function renderLivesHUD() {
+        const container = document.getElementById('livesIconsRow');
+        let html = '';
+        for (let i = 0; i < MAX_LIVES; i++) {
+          const active = i < lives;
+          html +=
+            '<svg class="w-4 h-4 sm:w-5 sm:h-5 ' +
+            (active ? 'text-cyan-400' : 'text-slate-700') +
+            '" viewBox="0 0 24 24" fill="' +
+            (active ? 'rgba(0,243,255,0.28)' : 'none') +
+            '" stroke="currentColor" stroke-width="2.2">' +
+            '<polygon points="12,3 20,20 12,16 4,20" />' +
+            '</svg>';
+        }
+        container.innerHTML = html;
+      }
+
+      function renderPowerupBarsHUD() {
+        const container = document.getElementById('activePowerupsHUD');
+        const keys = Object.keys(activeTimers);
+        if (keys.length === 0) {
+          container.innerHTML = '';
+          return;
+        }
+
+        container.innerHTML = keys
+          .map(function (key) {
+            const def = POWERUP_DEFS[key];
+            const timer = activeTimers[key];
+            const pct = Math.max(0, Math.min(100, (timer.remaining / timer.duration) * 100));
+            const pulse = timer.remaining <= 2.2 ? 'animate-pulse' : '';
+            return (
+              '<div class="cyber-hud-card px-2.5 py-1 rounded-lg min-w-[88px] sm:min-w-[112px] ' +
+              pulse +
+              '" style="border-color: ' +
+              def.color +
+              '88;">' +
+              '<div class="flex items-center justify-between gap-1.5 text-[9px] sm:text-[10px] font-display font-bold mb-0.5" style="color: ' +
+              def.color +
+              ';">' +
+              '<span>' +
+              def.shortLabel +
+              '</span>' +
+              '<span class="font-mono text-white/90">' +
+              timer.remaining.toFixed(1) +
+              's</span>' +
+              '</div>' +
+              '<div class="w-full h-1 bg-slate-800 rounded-full overflow-hidden">' +
+              '<div class="h-full rounded-full" style="width: ' +
+              pct.toFixed(1) +
+              '%; background-color: ' +
+              def.color +
+              ';"></div>' +
+              '</div>' +
+              '</div>'
+            );
+          })
+          .join('');
+      }
+
+      function updateWarpStatusHUD() {
+        const pill = document.getElementById('warpStatusPill');
+        const dot = document.getElementById('warpDot');
+        const txt = document.getElementById('warpStatusText');
+        if (!pill || !dot || !txt) return;
+
+        if (ship.warpCooldown <= 0) {
+          txt.textContent = 'WARP READY';
+          txt.className = 'text-purple-300';
+          dot.className = 'w-2 h-2 rounded-full bg-purple-400';
+        } else {
+          txt.textContent = 'WARP ' + ship.warpCooldown.toFixed(1) + 's';
+          txt.className = 'text-slate-400';
+          dot.className = 'w-2 h-2 rounded-full bg-slate-600';
+        }
+      }
+
+      // =========================================================================
+      // 8. POWER-UP DROPS & ACTIVATION (ALL 6 POWER-UPS)
+      // =========================================================================
+      function spawnPowerupCapsule(x, y, guaranteed) {
+        if (!guaranteed && (capsules.length >= 4 || Math.random() > 0.28)) return;
+
+        const pool = Object.values(POWERUP_DEFS);
+        const totalWeight = pool.reduce(function (acc, item) {
+          return acc + item.weight;
+        }, 0);
+        let r = Math.random() * totalWeight;
+        let chosen = pool[0];
+
+        for (let i = 0; i < pool.length; i++) {
+          r -= pool[i].weight;
+          if (r <= 0) {
+            chosen = pool[i];
+            break;
+          }
+        }
+
+        const a = Math.random() * Math.PI * 2;
+        const spd = 28 + Math.random() * 28;
+        capsules.push({
+          x: x,
+          y: y,
+          vx: Math.cos(a) * spd,
+          vy: Math.sin(a) * spd,
+          radius: 15,
+          type: chosen.id,
+          life: 14.0,
+          rot: 0
+        });
+      }
+
+      function triggerNovaEMP(x, y) {
+        const empRadius = Math.min(viewW, viewH) * 0.42;
+        shockwaves.push({
+          x: x,
+          y: y,
+          radius: 16,
+          maxRadius: empRadius,
+          color: PALETTE.purple,
+          life: 0.55,
+          maxLife: 0.55
+        });
+        triggerShake(0.32, 9);
+
+        // Vaporize enemy plasma bolts inside EMP radius
+        for (let i = enemyBullets.length - 1; i >= 0; i--) {
+          if (Math.hypot(enemyBullets[i].x - x, enemyBullets[i].y - y) <= empRadius) {
+            spawnParticles(enemyBullets[i].x, enemyBullets[i].y, PALETTE.purple, 6, 0.8);
+            enemyBullets.splice(i, 1);
+          }
+        }
+
+        // Shatter/damage asteroids within EMP blast radius
+        let destroyed = 0;
+        for (let i = asteroids.length - 1; i >= 0; i--) {
+          const ast = asteroids[i];
+          if (Math.hypot(ast.x - x, ast.y - y) <= empRadius + ast.radius) {
+            destroyAsteroid(i, true);
+            destroyed++;
+          }
+        }
+
+        const bonus = destroyed * 75 + 200;
+        addScore(bonus, x, y - 16, PALETTE.purple, 'NOVA EMP +' + bonus);
+      }
+
+      function collectPowerup(cap) {
+        const def = POWERUP_DEFS[cap.type];
+        sfx.powerup(cap.type);
+        spawnParticles(cap.x, cap.y, def.color, 20, 1.15);
+        spawnPopup(cap.x, cap.y - 14, def.name, def.color);
+
+        if (cap.type === 'triple') {
+          activeTimers.triple = { remaining: def.duration, duration: def.duration };
+        } else if (cap.type === 'railgun') {
+          activeTimers.railgun = { remaining: def.duration, duration: def.duration };
+        } else if (cap.type === 'shield') {
+          activeTimers.shield = { remaining: def.duration, duration: def.duration };
+        } else if (cap.type === 'chrono') {
+          activeTimers.chrono = { remaining: def.duration, duration: def.duration };
+        } else if (cap.type === 'emp') {
+          triggerNovaEMP(ship.x, ship.y);
+        } else if (cap.type === 'life') {
+          if (lives < MAX_LIVES) {
+            lives++;
+            renderLivesHUD();
+          } else {
+            addScore(500, ship.x, ship.y - 26, PALETTE.rose, '+500 MAX HULL');
+          }
+        }
+
+        renderPowerupBarsHUD();
+      }
+
+      // =========================================================================
+      // 9. COMBAT, WEAPONS, WARP & DAMAGE LOGIC
+      // =========================================================================
+      function firePlayerWeapons() {
+        if (ship.fireCooldown > 0) return;
+
+        const isRailgun = Boolean(activeTimers.railgun);
+        const isTriple = Boolean(activeTimers.triple);
+
+        const noseX = ship.x + Math.cos(ship.angle) * (ship.radius + 5);
+        const noseY = ship.y + Math.sin(ship.angle) * (ship.radius + 5);
+        const bulletSpeed = isRailgun ? 860 : 660;
+
+        const angles = isTriple ? [ship.angle - 0.17, ship.angle, ship.angle + 0.17] : [ship.angle];
+
+        for (let i = 0; i < angles.length; i++) {
+          const a = angles[i];
+          bullets.push({
+            x: noseX,
+            y: noseY,
+            vx: Math.cos(a) * bulletSpeed + ship.vx * 0.25,
+            vy: Math.sin(a) * bulletSpeed + ship.vy * 0.25,
+            angle: a,
+            life: isRailgun ? 0.95 : 1.05,
+            railgun: isRailgun,
+            hitIds: isRailgun ? new Set() : null
+          });
+        }
+
+        ship.fireCooldown = isRailgun ? 0.22 : 0.16;
+        sfx.laser(isRailgun ? 'railgun' : isTriple ? 'triple' : 'normal');
+      }
+
+      window.triggerHyperspaceWarp = function () {
+        if (gameState !== 'PLAYING' || ship.warpCooldown > 0) return;
+
+        // Departure burst
+        spawnParticles(ship.x, ship.y, PALETTE.purple, 18, 1.1);
+        shockwaves.push({
+          x: ship.x,
+          y: ship.y,
+          radius: 8,
+          maxRadius: 52,
+          color: PALETTE.purple,
+          life: 0.28,
+          maxLife: 0.28
+        });
+
+        const safe = findSafeCoordinates();
+        ship.x = safe.x;
+        ship.y = safe.y;
+        ship.vx *= 0.25;
+        ship.vy *= 0.25;
+        ship.invulnTimer = 1.35;
+        ship.warpCooldown = WARP_COOLDOWN_SEC;
+
+        // Arrival burst
+        spawnParticles(ship.x, ship.y, PALETTE.cyan, 20, 1.1);
+        shockwaves.push({
+          x: ship.x,
+          y: ship.y,
+          radius: 52,
+          maxRadius: 8,
+          color: PALETTE.cyan,
+          life: 0.28,
+          maxLife: 0.28
+        });
+        spawnPopup(ship.x, ship.y - 22, 'HYPERSPACE', PALETTE.purple);
+        sfx.warp();
+        updateWarpStatusHUD();
+      };
+
+      function destroyAsteroid(index, fromEMP) {
+        const ast = asteroids[index];
+        asteroids.splice(index, 1);
+
+        const basePts = ast.tier === 3 ? 100 : ast.tier === 2 ? 150 : 250;
+        registerComboKill();
+        if (!fromEMP) {
+          addScore(basePts, ast.x, ast.y, ast.color);
+        } else {
+          score += basePts;
+          if (score > highScore) {
+            highScore = score;
+            safeSetHighScore(highScore);
+          }
+          updateHUD();
+        }
+
+        sfx.explosion(ast.tier);
+        spawnParticles(ast.x, ast.y, ast.color, ast.tier === 3 ? 22 : ast.tier === 2 ? 15 : 10, 1.0);
+        if (ast.tier === 3) triggerShake(0.14, 4.5);
+
+        // Split Large -> 2 Medium, Medium -> 2 Small
+        if (ast.tier > 1) {
+          const nextTier = ast.tier - 1;
+          const baseAngle = Math.atan2(ast.vy, ast.vx);
+          const speed = Math.hypot(ast.vx, ast.vy) * 1.25 + 22;
+
+          for (let s = -1; s <= 1; s += 2) {
+            const splitAngle = baseAngle + s * (0.45 + Math.random() * 0.35);
+            asteroids.push(
+              createAsteroid(
+                ast.x + Math.cos(splitAngle) * 8,
+                ast.y + Math.sin(splitAngle) * 8,
+                nextTier,
+                Math.cos(splitAngle) * speed,
+                Math.sin(splitAngle) * speed
+              )
+            );
+          }
+        } else {
+          // Small asteroid destroyed: chance to drop power-up capsule
+          spawnPowerupCapsule(ast.x, ast.y, false);
+        }
+
+        // Medium/Large also have a smaller direct drop chance
+        if (ast.tier >= 2 && Math.random() < 0.14) {
+          spawnPowerupCapsule(ast.x, ast.y, true);
+        }
+      }
+
+      function handlePlayerImpact() {
+        if (ship.invulnTimer > 0) return;
+
+        // If Aegis Shield is active, absorb the hit and blast nearby hazards away!
+        if (activeTimers.shield) {
+          delete activeTimers.shield;
+          renderPowerupBarsHUD();
+          sfx.shieldAbsorb();
+          triggerShake(0.26, 8);
+          ship.invulnTimer = 1.5;
+
+          shockwaves.push({
+            x: ship.x,
+            y: ship.y,
+            radius: 18,
+            maxRadius: 150,
+            color: PALETTE.emerald,
+            life: 0.4,
+            maxLife: 0.4
+          });
+          spawnParticles(ship.x, ship.y, PALETTE.emerald, 24, 1.2);
+          spawnPopup(ship.x, ship.y - 24, 'AEGIS DEFLECT!', PALETTE.emerald);
+
+          // Push or shatter nearby asteroids
+          for (let i = asteroids.length - 1; i >= 0; i--) {
+            const ast = asteroids[i];
+            const dist = Math.hypot(ast.x - ship.x, ast.y - ship.y);
+            if (dist < 140 + ast.radius) {
+              destroyAsteroid(i, true);
+            }
+          }
+          return;
+        }
+
+        // Hull Damaged -> Lose 1 Life
+        lives--;
+        combo = 0;
+        comboTimer = 0;
+        activeTimers = {};
+        renderLivesHUD();
+        renderPowerupBarsHUD();
+        updateHUD();
+
+        sfx.explosion(4);
+        triggerShake(0.4, 11);
+        spawnParticles(ship.x, ship.y, PALETTE.cyan, 26, 1.3);
+        spawnParticles(ship.x, ship.y, PALETTE.magenta, 20, 1.2);
+
+        if (lives <= 0) {
+          triggerGameOver();
+          return;
+        }
+
+        // Respawn in safe location with invulnerability blink
+        const safe = findSafeCoordinates();
+        ship.x = safe.x;
+        ship.y = safe.y;
+        ship.vx = 0;
+        ship.vy = 0;
+        ship.angle = -Math.PI / 2;
+        ship.invulnTimer = 2.4;
+        spawnPopup(ship.x, ship.y - 24, 'HULL RESTORED', PALETTE.cyan);
+      }
+
+      // =========================================================================
+      // 10. GAME LIFECYCLE (START, PAUSE, MUTE, GAME OVER)
+      // =========================================================================
+      function showWaveBanner(sub, title) {
+        const banner = document.getElementById('waveBanner');
+        document.getElementById('waveBannerSub').textContent = sub;
+        document.getElementById('waveBannerTitle').textContent = title;
+        banner.classList.remove('hidden');
+        waveBannerTimer = 2.0;
+      }
+
+      window.startGame = function () {
+        const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+        if (now - lastStartCallMs < 150) return;
+        lastStartCallMs = now;
+
+        initAudio();
+        resizeCanvas();
+
+        score = 0;
+        highScore = safeGetHighScore();
+        wave = 1;
+        lives = STARTING_LIVES;
+        combo = 0;
+        comboTimer = 0;
+        activeTimers = {};
+
+        ship.x = viewW * 0.5;
+        ship.y = viewH * 0.5;
+        ship.vx = 0;
+        ship.vy = 0;
+        ship.angle = -Math.PI / 2;
+        ship.invulnTimer = 2.2;
+        ship.fireCooldown = 0;
+        ship.warpCooldown = 0;
+
+        bullets = [];
+        enemyBullets = [];
+        ufos = [];
+        capsules = [];
+        shockwaves = [];
+        popups = [];
+        for (let i = 0; i < MAX_PARTICLES; i++) {
+          particles[i].active = false;
+        }
+
+        ufoSpawnTimer = 14.0;
+        waveClearPending = false;
+        waveClearDelay = 0;
+
+        spawnWaveAsteroids(wave);
+
+        gameState = 'PLAYING';
+        document.getElementById('menuScreen').classList.add('hidden');
+        document.getElementById('pauseScreen').classList.add('hidden');
+        document.getElementById('gameOverScreen').classList.add('hidden');
+
+        updateHUD();
+        renderLivesHUD();
+        renderPowerupBarsHUD();
+        updateWarpStatusHUD();
+        updatePauseIcons();
+        showWaveBanner('SYSTEMS ONLINE', 'WAVE 1');
+        sfx.waveClear();
+      };
+
+      window.togglePause = function () {
+        if (gameState === 'PLAYING') {
+          gameState = 'PAUSED';
+          input.left = false;
+          input.right = false;
+          input.thrust = false;
+          input.fire = false;
+          document.getElementById('pauseScreen').classList.remove('hidden');
+        } else if (gameState === 'PAUSED') {
+          gameState = 'PLAYING';
+          lastFrameTime = performance.now();
+          document.getElementById('pauseScreen').classList.add('hidden');
+        }
+        updatePauseIcons();
+      };
+
+      function updatePauseIcons() {
+        const bars = document.getElementById('iconPauseBars');
+        const tri = document.getElementById('iconResumeTri');
+        if (gameState === 'PAUSED') {
+          bars.classList.add('hidden');
+          tri.classList.remove('hidden');
+        } else {
+          bars.classList.remove('hidden');
+          tri.classList.add('hidden');
+        }
+      }
+
+      window.toggleMute = function () {
+        isMuted = !isMuted;
+        const onIcon = document.getElementById('iconAudioOn');
+        const offIcon = document.getElementById('iconAudioOff');
+        if (isMuted) {
+          onIcon.classList.add('hidden');
+          offIcon.classList.remove('hidden');
+        } else {
+          onIcon.classList.remove('hidden');
+          offIcon.classList.add('hidden');
+          initAudio();
+          synthTone(660, 880, 0.06, 'sine', 0.1, 0);
+        }
+      };
+
+      function triggerGameOver() {
+        gameState = 'GAMEOVER';
+        const isRecord = score > 0 && score >= highScore;
+        safeSetHighScore(highScore);
+
+        document.getElementById('finalScoreVal').textContent = score.toLocaleString();
+        document.getElementById('finalBestVal').textContent = highScore.toLocaleString();
+        document.getElementById('finalWaveVal').textContent = String(wave);
+        document.getElementById('menuHighScore').textContent = highScore.toLocaleString();
+        document.getElementById('newHighScoreBadge').classList.toggle('hidden', !isRecord);
+
+        document.getElementById('waveBanner').classList.add('hidden');
+        document.getElementById('gameOverScreen').classList.remove('hidden');
+      }
+
+      // =========================================================================
+      // 11. SIMULATION UPDATE LOOP (60 FPS DELTA-TIME)
+      // =========================================================================
+      function update(dt) {
+        // Update particles, shockwaves, and popups in all states
+        for (let i = 0; i < MAX_PARTICLES; i++) {
+          const p = particles[i];
+          if (!p.active) continue;
+          p.life -= dt;
+          if (p.life <= 0) {
+            p.active = false;
+          } else {
+            p.x += p.vx * dt;
+            p.y += p.vy * dt;
+            p.vx *= 0.96;
+            p.vy *= 0.96;
+          }
+        }
+
+        for (let i = shockwaves.length - 1; i >= 0; i--) {
+          shockwaves[i].life -= dt;
+          if (shockwaves[i].life <= 0) shockwaves.splice(i, 1);
+        }
+
+        for (let i = popups.length - 1; i >= 0; i--) {
+          popups[i].y += popups[i].vy * dt;
+          popups[i].life -= dt;
+          if (popups[i].life <= 0) popups.splice(i, 1);
+        }
+
+        if (screenShakeTime > 0) {
+          screenShakeTime = Math.max(0, screenShakeTime - dt);
+        }
+
+        if (waveBannerTimer > 0) {
+          waveBannerTimer -= dt;
+          if (waveBannerTimer <= 0) {
+            document.getElementById('waveBanner').classList.add('hidden');
+          }
+        }
+
+        // Ambient menu drift for background asteroids
+        if (gameState === 'MENU') {
+          for (let i = 0; i < asteroids.length; i++) {
+            const ast = asteroids[i];
+            ast.x += ast.vx * dt * 0.5;
+            ast.y += ast.vy * dt * 0.5;
+            ast.angle += ast.rotSpeed * dt * 0.5;
+            wrapPosition(ast, ast.radius);
+          }
+          return;
+        }
+
+        if (gameState !== 'PLAYING') return;
+
+        // 1. Combo Decay Timer
+        if (comboTimer > 0) {
+          comboTimer = Math.max(0, comboTimer - dt);
+          const pct = (comboTimer / COMBO_WINDOW_SEC) * 100;
+          document.getElementById('comboTimerFill').style.width = pct.toFixed(1) + '%';
+          if (comboTimer === 0) {
+            combo = 0;
+            updateHUD();
+          }
+        }
+
+        // 2. Active Power-Up Countdowns
+        let hudDirty = false;
+        for (const key of Object.keys(activeTimers)) {
+          activeTimers[key].remaining -= dt;
+          hudDirty = true;
+          if (activeTimers[key].remaining <= 0) {
+            delete activeTimers[key];
+          }
+        }
+        if (hudDirty) renderPowerupBarsHUD();
+
+        // 3. Ship Timers, Rotation, Thrust & Drag
+        if (ship.invulnTimer > 0) ship.invulnTimer = Math.max(0, ship.invulnTimer - dt);
+        if (ship.fireCooldown > 0) ship.fireCooldown = Math.max(0, ship.fireCooldown - dt);
+        if (ship.warpCooldown > 0) {
+          ship.warpCooldown = Math.max(0, ship.warpCooldown - dt);
+          updateWarpStatusHUD();
+        }
+
+        const turnSpeed = 4.5; // rad/s
+        if (input.left) ship.angle -= turnSpeed * dt;
+        if (input.right) ship.angle += turnSpeed * dt;
+
+        if (input.thrust) {
+          const thrustAccel = 460;
+          ship.vx += Math.cos(ship.angle) * thrustAccel * dt;
+          ship.vy += Math.sin(ship.angle) * thrustAccel * dt;
+          ship.thrustAnim += dt * 24;
+
+          // Emit neon thruster exhaust sparks
+          if (Math.random() < 0.75) {
+            const rearX = ship.x - Math.cos(ship.angle) * (ship.radius + 3);
+            const rearY = ship.y - Math.sin(ship.angle) * (ship.radius + 3);
+            const spread = (Math.random() - 0.5) * 0.55;
+            const exhaustAngle = ship.angle + Math.PI + spread;
+            const spd = 110 + Math.random() * 110;
+            for (let i = 0; i < MAX_PARTICLES; i++) {
+              const p = particles[i];
+              if (!p.active) {
+                p.active = true;
+                p.x = rearX;
+                p.y = rearY;
+                p.vx = Math.cos(exhaustAngle) * spd + ship.vx * 0.3;
+                p.vy = Math.sin(exhaustAngle) * spd + ship.vy * 0.3;
+                p.size = 2 + Math.random() * 2;
+                p.color = Math.random() < 0.5 ? PALETTE.magenta : PALETTE.orange;
+                p.maxLife = 0.22 + Math.random() * 0.14;
+                p.life = p.maxLife;
+                break;
+              }
+            }
+          }
+        }
+
+        // Space friction & speed cap
+        const damping = Math.pow(0.45, dt);
+        ship.vx *= damping;
+        ship.vy *= damping;
+
+        const maxShipSpeed = 440;
+        const currentSpeed = Math.hypot(ship.vx, ship.vy);
+        if (currentSpeed > maxShipSpeed) {
+          ship.vx = (ship.vx / currentSpeed) * maxShipSpeed;
+          ship.vy = (ship.vy / currentSpeed) * maxShipSpeed;
+        }
+
+        ship.x += ship.vx * dt;
+        ship.y += ship.vy * dt;
+        wrapPosition(ship, ship.radius);
+
+        // Auto-fire while Fire is held
+        if (input.fire) {
+          firePlayerWeapons();
+        }
+
+        // 4. Update Player Bullets
+        for (let i = bullets.length - 1; i >= 0; i--) {
+          const b = bullets[i];
+          b.x += b.vx * dt;
+          b.y += b.vy * dt;
+          b.life -= dt;
+          wrapPosition(b, 6);
+
+          if (b.life <= 0) {
+            bullets.splice(i, 1);
+            continue;
+          }
+
+          let bulletConsumed = false;
+
+          // Check collision with Asteroids
+          for (let j = asteroids.length - 1; j >= 0; j--) {
+            const ast = asteroids[j];
+            if (b.railgun && b.hitIds.has(ast.id)) continue;
+
+            if (Math.hypot(b.x - ast.x, b.y - ast.y) <= ast.radius + 5) {
+              if (b.railgun) {
+                b.hitIds.add(ast.id);
+              } else {
+                bulletConsumed = true;
+              }
+              destroyAsteroid(j, false);
+              if (bulletConsumed) break;
+            }
+          }
+
+          if (bulletConsumed) {
+            bullets.splice(i, 1);
+            continue;
+          }
+
+          // Check collision with Cyber UFOs
+          for (let u = ufos.length - 1; u >= 0; u--) {
+            const ufo = ufos[u];
+            if (Math.hypot(b.x - ufo.x, b.y - ufo.y) <= ufo.radius + 6) {
+              ufo.hp--;
+              if (!b.railgun) bulletConsumed = true;
+
+              if (ufo.hp <= 0) {
+                ufos.splice(u, 1);
+                registerComboKill();
+                addScore(500, ufo.x, ufo.y, PALETTE.gold);
+                sfx.explosion(4);
+                triggerShake(0.28, 7);
+                spawnParticles(ufo.x, ufo.y, PALETTE.rose, 24, 1.25);
+                spawnParticles(ufo.x, ufo.y, PALETTE.gold, 14, 1.1);
+                // UFOs guarantee a power-up capsule drop!
+                spawnPowerupCapsule(ufo.x, ufo.y, true);
+              } else {
+                spawnParticles(ufo.x, ufo.y, PALETTE.gold, 10, 0.9);
+                sfx.shieldAbsorb();
+              }
+              break;
+            }
+          }
+
+          if (bulletConsumed) {
+            bullets.splice(i, 1);
+          }
+        }
+
+        // 5. Update Asteroids (Chrono Field slows velocities by 50%)
+        const enemyTimeScale = activeTimers.chrono ? 0.5 : 1.0;
+
+        for (let i = asteroids.length - 1; i >= 0; i--) {
+          const ast = asteroids[i];
+          ast.x += ast.vx * dt * enemyTimeScale;
+          ast.y += ast.vy * dt * enemyTimeScale;
+          ast.angle += ast.rotSpeed * dt * enemyTimeScale;
+          wrapPosition(ast, ast.radius);
+
+          // Ship collision check
+          const hitDist = ast.radius + ship.radius * 0.82;
+          if (Math.hypot(ast.x - ship.x, ast.y - ship.y) < hitDist) {
+            handlePlayerImpact();
+            break;
+          }
+        }
+
+        // 6. Cyber UFO Spawner & AI (Wave 2+)
+        if (wave >= 2) {
+          ufoSpawnTimer -= dt;
+          if (ufoSpawnTimer <= 0 && ufos.length === 0) {
+            spawnCyberUFO();
+            ufoSpawnTimer = Math.max(12, 21 - wave * 0.8);
+          }
+        }
+
+        if (ufos.length > 0) {
+          ufoWarbleTimer -= dt;
+          if (ufoWarbleTimer <= 0) {
+            sfx.ufoWarble();
+            ufoWarbleTimer = 0.55;
+          }
+        }
+
+        for (let i = ufos.length - 1; i >= 0; i--) {
+          const ufo = ufos[i];
+          ufo.phase += dt * 2.5;
+          ufo.x += ufo.vx * dt * enemyTimeScale;
+          ufo.y = ufo.baseY + Math.sin(ufo.phase) * 42;
+          ufo.fireTimer -= dt * enemyTimeScale;
+
+          // Fire aimed plasma bolt toward player ship
+          if (ufo.fireTimer <= 0) {
+            ufo.fireTimer = Math.max(1.15, 2.0 - wave * 0.06);
+            const aimAngle = Math.atan2(ship.y - ufo.y, ship.x - ufo.x) + (Math.random() - 0.5) * 0.24;
+            const boltSpeed = 310 + Math.min(120, wave * 10);
+            enemyBullets.push({
+              x: ufo.x,
+              y: ufo.y,
+              vx: Math.cos(aimAngle) * boltSpeed,
+              vy: Math.sin(aimAngle) * boltSpeed,
+              life: 2.2
+            });
+            sfx.ufoShot();
+          }
+
+          // Ship collision with UFO
+          if (Math.hypot(ufo.x - ship.x, ufo.y - ship.y) < ufo.radius + ship.radius * 0.85) {
+            ufos.splice(i, 1);
+            sfx.explosion(4);
+            spawnParticles(ufo.x, ufo.y, PALETTE.rose, 20, 1.2);
+            handlePlayerImpact();
+            continue;
+          }
+
+          // Despawn UFO once it crosses the far screen edge
+          if ((ufo.vx > 0 && ufo.x > viewW + 60) || (ufo.vx < 0 && ufo.x < -60)) {
+            ufos.splice(i, 1);
+          }
+        }
+
+        // 7. Update Enemy Plasma Bolts
+        for (let i = enemyBullets.length - 1; i >= 0; i--) {
+          const eb = enemyBullets[i];
+          eb.x += eb.vx * dt * enemyTimeScale;
+          eb.y += eb.vy * dt * enemyTimeScale;
+          eb.life -= dt;
+          wrapPosition(eb, 6);
+
+          if (eb.life <= 0) {
+            enemyBullets.splice(i, 1);
+            continue;
+          }
+
+          if (Math.hypot(eb.x - ship.x, eb.y - ship.y) < ship.radius + 5) {
+            enemyBullets.splice(i, 1);
+            handlePlayerImpact();
+          }
+        }
+
+        // 8. Update Power-Up Capsules & Ship Magnet Pickup
+        for (let i = capsules.length - 1; i >= 0; i--) {
+          const cap = capsules[i];
+          cap.x += cap.vx * dt;
+          cap.y += cap.vy * dt;
+          cap.rot += dt * 2.2;
+          cap.life -= dt;
+          wrapPosition(cap, cap.radius);
+
+          if (cap.life <= 0) {
+            capsules.splice(i, 1);
+            continue;
+          }
+
+          // Gentle magnetic attraction when ship flies close
+          const dist = Math.hypot(ship.x - cap.x, ship.y - cap.y);
+          if (dist < 95 && dist > 1) {
+            cap.x += ((ship.x - cap.x) / dist) * 145 * dt;
+            cap.y += ((ship.y - cap.y) / dist) * 145 * dt;
+          }
+
+          if (dist <= ship.radius + cap.radius + 4) {
+            capsules.splice(i, 1);
+            collectPowerup(cap);
+          }
+        }
+
+        // 9. Wave Progression Check
+        if (asteroids.length === 0 && ufos.length === 0) {
+          if (!waveClearPending) {
+            waveClearPending = true;
+            waveClearDelay = 1.5;
+            const waveBonus = wave * 500;
+            addScore(waveBonus, viewW * 0.5, viewH * 0.42, PALETTE.cyan, 'WAVE BONUS +' + waveBonus);
+            sfx.waveClear();
+          } else {
+            waveClearDelay -= dt;
+            if (waveClearDelay <= 0) {
+              waveClearPending = false;
+              wave++;
+              updateHUD();
+              spawnWaveAsteroids(wave);
+              showWaveBanner(
+                wave === 2 ? 'WARNING: CYBER UFOs DETECTED' : 'THREAT LEVEL ESCALATING',
+                'WAVE ' + wave
+              );
+            }
+          }
+        }
+      }
+
+      // =========================================================================
+      // 12. HIGH-FPS DUAL-LAYER VECTOR RENDERER
+      // =========================================================================
+      function drawBackground(nowSec) {
+        // Deep cyberpunk void
+        ctx.fillStyle = PALETTE.bg;
+        ctx.fillRect(0, 0, viewW, viewH);
+
+        // Faint cyber-grid
+        const gridStep = 56;
+        ctx.strokeStyle = 'rgba(0, 243, 255, 0.04)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (let x = 0; x <= viewW; x += gridStep) {
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x, viewH);
+        }
+        for (let y = 0; y <= viewH; y += gridStep) {
+          ctx.moveTo(0, y);
+          ctx.lineTo(viewW, y);
+        }
+        ctx.stroke();
+
+        // Twinkling starfield
+        for (let i = 0; i < stars.length; i++) {
+          const s = stars[i];
+          const alpha = 0.25 + 0.65 * (0.5 + 0.5 * Math.sin(nowSec * s.speed + s.phase));
+          ctx.globalAlpha = alpha;
+          ctx.fillStyle = s.color;
+          ctx.fillRect(s.x, s.y, s.r, s.r);
+        }
+        ctx.globalAlpha = 1;
+
+        // Subtle Chrono Field blue edge tint when active
+        if (activeTimers.chrono) {
+          ctx.strokeStyle = 'rgba(56, 189, 248, 0.35)';
+          ctx.lineWidth = 4;
+          ctx.strokeRect(2, 2, viewW - 4, viewH - 4);
+        }
+      }
+
+      function drawDualStrokePath(buildPathFn, color, outerWidth, innerWidth, addWhiteCore) {
+        // Layer 1: Wide semi-transparent neon outer stroke
+        ctx.save();
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = color;
+        ctx.globalAlpha = 0.28;
+        ctx.lineWidth = outerWidth;
+        ctx.beginPath();
+        buildPathFn();
+        ctx.stroke();
+
+        // Layer 2: Crisp bright inner neon stroke
+        ctx.globalAlpha = 1.0;
+        ctx.lineWidth = innerWidth;
+        ctx.beginPath();
+        buildPathFn();
+        ctx.stroke();
+
+        // Optional Layer 3: Razor-thin white hot core
+        if (addWhiteCore) {
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = Math.max(1, innerWidth * 0.42);
+          ctx.beginPath();
+          buildPathFn();
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      function drawAsteroids() {
+        for (let i = 0; i < asteroids.length; i++) {
+          const ast = asteroids[i];
+          drawWithToroidalWrap(ast.x, ast.y, ast.radius, function (wx, wy) {
+            ctx.save();
+            ctx.translate(wx, wy);
+            ctx.rotate(ast.angle);
+
+            // Subtle dark interior fill so overlapping stars don't clutter geometry
+            ctx.fillStyle = 'rgba(8, 7, 19, 0.72)';
+            ctx.beginPath();
+            for (let v = 0; v < ast.vertices.length; v++) {
+              const vx = ast.vertices[v].cos * ast.radius;
+              const vy = ast.vertices[v].sin * ast.radius;
+              if (v === 0) ctx.moveTo(vx, vy);
+              else ctx.lineTo(vx, vy);
+            }
+            ctx.closePath();
+            ctx.fill();
+
+            // Dual-layer neon polygon outline
+            drawDualStrokePath(
+              function () {
+                for (let v = 0; v < ast.vertices.length; v++) {
+                  const vx = ast.vertices[v].cos * ast.radius;
+                  const vy = ast.vertices[v].sin * ast.radius;
+                  if (v === 0) ctx.moveTo(vx, vy);
+                  else ctx.lineTo(vx, vy);
+                }
+                ctx.closePath();
+              },
+              ast.color,
+              7,
+              2.2,
+              false
+            );
+
+            // Internal geometric facet lines
+            ctx.strokeStyle = ast.color;
+            ctx.globalAlpha = 0.35;
+            ctx.lineWidth = 1.2;
+            ctx.beginPath();
+            for (let f = 0; f < ast.facets.length; f++) {
+              const pair = ast.facets[f];
+              const p1 = ast.vertices[pair[0]];
+              const p2 = ast.vertices[pair[1]];
+              ctx.moveTo(p1.cos * ast.radius * 0.92, p1.sin * ast.radius * 0.92);
+              ctx.lineTo(p2.cos * ast.radius * 0.92, p2.sin * ast.radius * 0.92);
+            }
+            ctx.stroke();
+            ctx.globalAlpha = 1;
+
+            ctx.restore();
+          });
+        }
+      }
+
+      function drawCyberUFOs(nowSec) {
+        for (let i = 0; i < ufos.length; i++) {
+          const ufo = ufos[i];
+          ctx.save();
+          ctx.translate(ufo.x, ufo.y);
+
+          // Pre-rendered glow sprite behind saucer
+          const glow = getGlowSprite(PALETTE.rose, 40);
+          ctx.drawImage(glow, -40, -40);
+
+          // Saucer hull
+          drawDualStrokePath(
+            function () {
+              // Lower saucer dish
+              ctx.moveTo(-22, 2);
+              ctx.lineTo(-12, 10);
+              ctx.lineTo(12, 10);
+              ctx.lineTo(22, 2);
+              ctx.lineTo(-22, 2);
+              // Upper dome
+              ctx.moveTo(-11, 2);
+              ctx.lineTo(-6, -8);
+              ctx.lineTo(6, -8);
+              ctx.lineTo(11, 2);
+            },
+            PALETTE.rose,
+            7,
+            2.2,
+            true
+          );
+
+          // Pulsing reactor lights across rim
+          const blink = Math.sin(nowSec * 14) > 0;
+          ctx.fillStyle = blink ? PALETTE.gold : PALETTE.cyan;
+          ctx.fillRect(-10, 4, 4, 3);
+          ctx.fillRect(-2, 4, 4, 3);
+          ctx.fillRect(6, 4, 4, 3);
+
+          ctx.restore();
+        }
+      }
+
+      function drawPowerupCapsules(nowSec) {
+        for (let i = 0; i < capsules.length; i++) {
+          const cap = capsules[i];
+          if (cap.life <= 3.0 && Math.sin(nowSec * 22) < -0.2) continue;
+
+          const def = POWERUP_DEFS[cap.type];
+          drawWithToroidalWrap(cap.x, cap.y, cap.radius, function (wx, wy) {
+            ctx.save();
+            ctx.translate(wx, wy);
+
+            const glow = getGlowSprite(def.color, 28);
+            ctx.drawImage(glow, -28, -28);
+
+            // Rotating diamond-hex capsule border
+            ctx.save();
+            ctx.rotate(cap.rot);
+            ctx.fillStyle = '#080713';
+            ctx.beginPath();
+            for (let s = 0; s < 6; s++) {
+              const a = (s / 6) * Math.PI * 2;
+              const px = Math.cos(a) * cap.radius;
+              const py = Math.sin(a) * cap.radius;
+              if (s === 0) ctx.moveTo(px, py);
+              else ctx.lineTo(px, py);
+            }
+            ctx.closePath();
+            ctx.fill();
+
+            drawDualStrokePath(
+              function () {
+                for (let s = 0; s < 6; s++) {
+                  const a = (s / 6) * Math.PI * 2;
+                  const px = Math.cos(a) * cap.radius;
+                  const py = Math.sin(a) * cap.radius;
+                  if (s === 0) ctx.moveTo(px, py);
+                  else ctx.lineTo(px, py);
+                }
+                ctx.closePath();
+              },
+              def.color,
+              6,
+              2,
+              false
+            );
+            ctx.restore();
+
+            // Upright crisp icon badge
+            ctx.font = '900 10px Orbitron, Inter, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = def.color;
+            ctx.fillText(def.icon, 0, 0.5);
+
+            ctx.restore();
+          });
+        }
+      }
+
+      function drawBullets() {
+        // Player Plasma & Railgun Bolts
+        for (let i = 0; i < bullets.length; i++) {
+          const b = bullets[i];
+          ctx.save();
+          ctx.translate(b.x, b.y);
+          ctx.rotate(b.angle);
+
+          if (b.railgun) {
+            // Piercing Gold/Magenta High-Energy Railgun Beam
+            drawDualStrokePath(
+              function () {
+                ctx.moveTo(-22, 0);
+                ctx.lineTo(14, 0);
+              },
+              PALETTE.gold,
+              9,
+              3.2,
+              true
+            );
+          } else {
+            const col = activeTimers.triple ? PALETTE.cyan : '#38bdf8';
+            drawDualStrokePath(
+              function () {
+                ctx.moveTo(-9, 0);
+                ctx.lineTo(8, 0);
+              },
+              col,
+              7,
+              2.5,
+              true
+            );
+          }
+          ctx.restore();
+        }
+
+        // Enemy Red Plasma Orbs
+        for (let i = 0; i < enemyBullets.length; i++) {
+          const eb = enemyBullets[i];
+          const glow = getGlowSprite(PALETTE.rose, 14);
+          ctx.drawImage(glow, eb.x - 14, eb.y - 14);
+
+          ctx.fillStyle = PALETTE.rose;
+          ctx.beginPath();
+          ctx.arc(eb.x, eb.y, 4.2, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.fillStyle = '#ffffff';
+          ctx.beginPath();
+          ctx.arc(eb.x, eb.y, 2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      function drawPlayerShip(nowSec) {
+        if (gameState !== 'PLAYING' && gameState !== 'PAUSED') return;
+
+        // Blink during spawn/warp invulnerability
+        if (ship.invulnTimer > 0 && Math.sin(nowSec * 28) < -0.15) {
+          return;
+        }
+
+        drawWithToroidalWrap(ship.x, ship.y, ship.radius + 14, function (wx, wy) {
+          ctx.save();
+          ctx.translate(wx, wy);
+
+          // Hexagonal Aegis Shield ring when active
+          if (activeTimers.shield) {
+            const shieldR = ship.radius + 12 + Math.sin(nowSec * 8) * 1.5;
+            ctx.save();
+            ctx.rotate(nowSec * 0.9);
+            drawDualStrokePath(
+              function () {
+                for (let s = 0; s < 6; s++) {
+                  const a = (s / 6) * Math.PI * 2;
+                  const sx = Math.cos(a) * shieldR;
+                  const sy = Math.sin(a) * shieldR;
+                  if (s === 0) ctx.moveTo(sx, sy);
+                  else ctx.lineTo(sx, sy);
+                }
+                ctx.closePath();
+              },
+              PALETTE.emerald,
+              7,
+              2,
+              false
+            );
+            ctx.restore();
+          }
+
+          ctx.rotate(ship.angle);
+
+          // Animated Thruster Flame Cone
+          if (input.thrust && gameState === 'PLAYING') {
+            const flameLen = 14 + Math.sin(ship.thrustAnim) * 5;
+            drawDualStrokePath(
+              function () {
+                ctx.moveTo(-10, -5);
+                ctx.lineTo(-10 - flameLen, 0);
+                ctx.lineTo(-10, 5);
+              },
+              PALETTE.magenta,
+              7,
+              2.4,
+              true
+            );
+          }
+
+          // Dark cockpit fill
+          ctx.fillStyle = '#070b19';
+          ctx.beginPath();
+          ctx.moveTo(18, 0);
+          ctx.lineTo(-13, -12);
+          ctx.lineTo(-8, 0);
+          ctx.lineTo(-13, 12);
+          ctx.closePath();
+          ctx.fill();
+
+          // Sleek Delta-Wing Neon Vector Hull
+          drawDualStrokePath(
+            function () {
+              ctx.moveTo(18, 0);
+              ctx.lineTo(-13, -12);
+              ctx.lineTo(-8, 0);
+              ctx.lineTo(-13, 12);
+              ctx.closePath();
+            },
+            PALETTE.cyan,
+            8,
+            2.4,
+            true
+          );
+
+          // Inner cockpit accent
+          ctx.fillStyle = activeTimers.railgun ? PALETTE.gold : PALETTE.cyan;
+          ctx.beginPath();
+          ctx.moveTo(6, 0);
+          ctx.lineTo(-3, -3.5);
+          ctx.lineTo(-3, 3.5);
+          ctx.closePath();
+          ctx.fill();
+
+          ctx.restore();
+        });
+      }
+
+      function drawFXAndPopups() {
+        // Shockwaves
+        for (let i = 0; i < shockwaves.length; i++) {
+          const sw = shockwaves[i];
+          const progress = 1 - sw.life / sw.maxLife;
+          const r = sw.radius + (sw.maxRadius - sw.radius) * progress;
+          const alpha = Math.max(0, sw.life / sw.maxLife);
+          ctx.save();
+          ctx.globalAlpha = alpha;
+          ctx.strokeStyle = sw.color;
+          ctx.lineWidth = 4 * alpha + 1;
+          ctx.beginPath();
+          ctx.arc(sw.x, sw.y, r, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        // Pooled Particle Sparks
+        for (let i = 0; i < MAX_PARTICLES; i++) {
+          const p = particles[i];
+          if (!p.active) continue;
+          ctx.globalAlpha = Math.max(0, p.life / p.maxLife);
+          ctx.fillStyle = p.color;
+          ctx.fillRect(p.x - p.size * 0.5, p.y - p.size * 0.5, p.size, p.size);
+        }
+        ctx.globalAlpha = 1;
+
+        // Floating Neon Score & Event Popups
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.font = '800 13px Orbitron, Inter, sans-serif';
+        for (let i = 0; i < popups.length; i++) {
+          const pop = popups[i];
+          ctx.globalAlpha = Math.min(1, pop.life * 1.3);
+          ctx.fillStyle = '#05040a';
+          ctx.fillText(pop.text, pop.x + 1.5, pop.y + 1.5);
+          ctx.fillStyle = pop.color;
+          ctx.fillText(pop.text, pop.x, pop.y);
+        }
+        ctx.globalAlpha = 1;
+      }
+
+      function render(nowMs) {
+        const nowSec = nowMs * 0.001;
+        ctx.save();
+
+        if (screenShakeTime > 0) {
+          const mag = (screenShakeTime / 0.4) * screenShakeMag;
+          ctx.translate((Math.random() - 0.5) * mag * 2, (Math.random() - 0.5) * mag * 2);
+        }
+
+        drawBackground(nowSec);
+        drawAsteroids();
+        drawCyberUFOs(nowSec);
+        drawPowerupCapsules(nowSec);
+        drawBullets();
+        drawPlayerShip(nowSec);
+        drawFXAndPopups();
+
+        ctx.restore();
+      }
+
+      // =========================================================================
+      // 13. MAIN ANIMATION LOOP & DESKTOP / TOUCH INPUT BINDINGS
+      // =========================================================================
+      function gameLoop(nowMs) {
+        if (!lastFrameTime) lastFrameTime = nowMs;
+        const dt = Math.min(0.05, Math.max(0, (nowMs - lastFrameTime) * 0.001));
+        lastFrameTime = nowMs;
+
+        update(dt);
+        render(nowMs);
+        window.requestAnimationFrame(gameLoop);
+      }
+
+      // Desktop Keyboard Controls
+      document.addEventListener('keydown', function (e) {
+        const code = e.code;
+
+        if (code === 'KeyM') {
+          window.toggleMute();
+          return;
+        }
+
+        if (code === 'KeyP' || code === 'Escape') {
+          if (gameState === 'PLAYING' || gameState === 'PAUSED') {
+            e.preventDefault();
+            window.togglePause();
+          }
+          return;
+        }
+
+        if (gameState === 'MENU' || gameState === 'GAMEOVER') {
+          if (code === 'Space' || code === 'Enter') {
+            e.preventDefault();
+            window.startGame();
+          }
+          return;
+        }
+
+        if (gameState === 'PAUSED') {
+          if (code === 'Space' || code === 'Enter') {
+            e.preventDefault();
+            window.togglePause();
+          }
+          return;
+        }
+
+        if (
+          code === 'ArrowLeft' ||
+          code === 'ArrowRight' ||
+          code === 'ArrowUp' ||
+          code === 'ArrowDown' ||
+          code === 'Space'
+        ) {
+          e.preventDefault();
+        }
+
+        if (code === 'ArrowLeft' || code === 'KeyA') input.left = true;
+        if (code === 'ArrowRight' || code === 'KeyD') input.right = true;
+        if (code === 'ArrowUp' || code === 'KeyW') input.thrust = true;
+        if (code === 'Space') input.fire = true;
+
+        if (!e.repeat && (code === 'ShiftLeft' || code === 'ShiftRight' || code === 'ArrowDown' || code === 'KeyS')) {
+          window.triggerHyperspaceWarp();
+        }
+      });
+
+      document.addEventListener('keyup', function (e) {
+        const code = e.code;
+        if (code === 'ArrowLeft' || code === 'KeyA') input.left = false;
+        if (code === 'ArrowRight' || code === 'KeyD') input.right = false;
+        if (code === 'ArrowUp' || code === 'KeyW') input.thrust = false;
+        if (code === 'Space') input.fire = false;
+      });
+
+      // Multi-Touch Mobile Controls
+      function bindTouchHoldButton(btnId, onDown, onUp) {
+        const btn = document.getElementById(btnId);
+        if (!btn) return;
+
+        btn.addEventListener('pointerdown', function (e) {
+          e.preventDefault();
+          btn.classList.add('active-touch');
+          try {
+            btn.setPointerCapture(e.pointerId);
+          } catch (err) {}
+          onDown();
+        });
+
+        const release = function (e) {
+          if (e) e.preventDefault();
+          btn.classList.remove('active-touch');
+          onUp();
+        };
+
+        btn.addEventListener('pointerup', release);
+        btn.addEventListener('pointercancel', release);
+      }
+
+      bindTouchHoldButton(
+        'touchLeftBtn',
+        function () {
+          input.left = true;
+        },
+        function () {
+          input.left = false;
+        }
+      );
+
+      bindTouchHoldButton(
+        'touchRightBtn',
+        function () {
+          input.right = true;
+        },
+        function () {
+          input.right = false;
+        }
+      );
+
+      bindTouchHoldButton(
+        'touchThrustBtn',
+        function () {
+          input.thrust = true;
+        },
+        function () {
+          input.thrust = false;
+        }
+      );
+
+      bindTouchHoldButton(
+        'touchFireBtn',
+        function () {
+          input.fire = true;
+        },
+        function () {
+          input.fire = false;
+        }
+      );
+
+      const touchWarpBtn = document.getElementById('touchWarpBtn');
+      if (touchWarpBtn) {
+        touchWarpBtn.addEventListener('pointerdown', function (e) {
+          e.preventDefault();
+          touchWarpBtn.classList.add('active-touch');
+          window.triggerHyperspaceWarp();
+        });
+        const releaseWarp = function () {
+          touchWarpBtn.classList.remove('active-touch');
+        };
+        touchWarpBtn.addEventListener('pointerup', releaseWarp);
+        touchWarpBtn.addEventListener('pointercancel', releaseWarp);
+      }
+
+      // Redundant addEventListener bindings on Start & Restart buttons
+      const startBtn = document.getElementById('startBtn');
+      const restartBtn = document.getElementById('restartBtn');
+      if (startBtn) {
+        startBtn.addEventListener('click', function () {
+          window.startGame();
+        });
+      }
+      if (restartBtn) {
+        restartBtn.addEventListener('click', function () {
+          window.startGame();
+        });
+      }
+
+      // Pause automatically if tab is hidden during gameplay
+      document.addEventListener('visibilitychange', function () {
+        if (document.hidden && gameState === 'PLAYING') {
+          window.togglePause();
+        }
+      });
+
+      // Initial Boot & Decorative Menu Asteroids
+      document.getElementById('menuHighScore').textContent = highScore.toLocaleString();
+      document.getElementById('highScoreVal').textContent = highScore.toLocaleString();
+      resizeCanvas();
+      renderLivesHUD();
+      ship.x = viewW * 0.5;
+      ship.y = viewH * 0.5;
+      spawnWaveAsteroids(1);
+      window.requestAnimationFrame(gameLoop);
+    })();
+  </script>
+</body>
+</html>
